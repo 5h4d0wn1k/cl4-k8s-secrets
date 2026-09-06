@@ -1,0 +1,131 @@
+# CL4 demo fixture — intentionally insecure manifests (synthetic, for lab use)
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+  namespace: prod
+data:
+  database_url: "postgresql://admin:SuperSecret1!@db.example.com:5432/appdb"
+  customer_env: "production"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: app-credentials
+  namespace: prod
+type: Opaque
+data:
+  api_key: QUtJQVpYQ1JHQjJJNFlaU0VDMkhFWA==
+  password: c3VwZXJzZWNyZXQtbGFiLWRlbW8=
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web-deploy
+  namespace: prod
+spec:
+  replicas: 2
+  template:
+    spec:
+      imagePullSecrets:
+        - name: app-credentials
+      containers:
+        - name: web
+          image: example.com/web:1.2.3
+          envFrom:
+            - configMapRef:
+                name: app-config
+          env:
+            - name: DB_PASSWORD
+              value: "HardcodedDbPass123!"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: worker-deploy
+  namespace: prod
+spec:
+  replicas: 1
+  template:
+    spec:
+      imagePullSecrets:
+        - name: registry-cred-not-defined
+      containers:
+        - name: worker
+          image: example.com/worker:0.9
+          envFrom:
+            - secretRef:
+                name: worker-db-secret-missing
+          env:
+            - name: PAYMENT_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: stripe-live-key
+                  key: key
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: plaintext-secret
+  namespace: prod
+type: Opaque
+data:
+  plainkey: cGxhaW50ZXh0LXZhbHVlLTEyMzQ1Ng==
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: deploy-bot
+  namespace: prod
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: over-privileged
+  namespace: prod
+rules:
+  - apiGroups: [""]
+    resources: ["*"]
+    verbs: ["*"]
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "list", "watch", "create", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: cluster-admin-clone
+rules:
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources: ["clusterroles", "rolebindings", "clusterrolebindings"]
+    verbs: ["create", "update", "patch", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: deploy-bot-binding
+  namespace: prod
+subjects:
+  - kind: ServiceAccount
+    name: deploy-bot
+    namespace: prod
+roleRef:
+  kind: Role
+  name: over-privileged
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-web
+  namespace: prod
+spec:
+  podSelector:
+    matchLabels:
+      app: web
+  ingress:
+    - from:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+      ports:
+        - port: 80
