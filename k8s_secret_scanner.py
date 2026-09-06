@@ -737,6 +737,8 @@ def main():
 
     report = findings_to_json(findings)
     if args.output:
+        out_dir = os.path.dirname(os.path.abspath(args.output))
+        os.makedirs(out_dir, exist_ok=True)
         with open(args.output, "w") as f:
             json.dump(report, f, indent=2, default=str)
         print(f"[+] JSON report written to {args.output}")
