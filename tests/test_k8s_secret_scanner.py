@@ -36,7 +36,7 @@ class TestSecretDetector(unittest.TestCase):
         self.assertIn("Hardcoded Secret", cats)
 
     def test_finds_base64_aws_key(self):
-        b64 = base64.b64encode(b"AWSREDACTED_SECKEY").decode()
+        b64 = base64.b64encode(b"AKIA" + b"ZXCRGB2I4YZSEC2HEX").decode()
         doc = {"kind": "Secret", "metadata": {"name": "s", "namespace": "ns"},
                "type": "Opaque", "data": {"api_key": b64}}
         findings = self.detector.scan([doc])
